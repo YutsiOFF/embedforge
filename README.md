@@ -2,10 +2,12 @@
 
 Bot Discord de creation d'embeds + constructeur web statique (GitHub Pages).
 
-- `/embed create` : modale (titre, description, couleur, image, miniature) puis apercu prive avec boutons
+- `/embed create` : modale (titre, description, couleur, image ou GIF, miniature) puis apercu prive avec boutons
 - `/embed import` : coller un JSON exporte par le site
 - `/embed aide` : mode d'emploi + lien du site
-- Site : apercu Discord en direct, modeles, editeur de champs, export JSON / code discord.js
+- Jusqu'a 10 embeds empiles dans un seul message (navigation ◀ ▶, ajout, suppression, duplication)
+- GIF animes : colle l'URL directe du fichier (`.gif`, `.webp`, `.apng`)
+- Site : apercu Discord en direct, onglets d'embeds, modeles, editeur de champs, export JSON / code discord.js
 
 ## 1. Prerequis
 
@@ -51,11 +53,15 @@ Le bot affiche `Connecte en tant que ...`, puis dans Discord : `/embed create`.
 
 | Bouton | Effet |
 | --- | --- |
-| Ajouter un champ | modale nom / valeur / inline (25 max) |
-| Auteur / Footer | auteur, footer, horodatage |
-| JSON | affiche le JSON de l'embed courant |
-| Envoyer | ouvre un selecteur de salon puis publie |
-| menu Retirer un champ | supprime un champ precis |
+| Ajouter un champ | modale nom / valeur / inline (25 max par embed) |
+| Auteur / Footer | auteur, footer, horodatage de l'embed courant |
+| Modifier | rouvre titre / description / couleur / image / miniature du bloc courant |
+| JSON | affiche le JSON de tout le message (un objet, ou `{ embeds: [...] }`) |
+| Envoyer | ouvre un selecteur de salon puis publie tous les embeds ensemble |
+| ◀ ▶ | passe d'un embed a l'autre |
+| Ajouter un embed | empile un nouveau bloc (10 maximum) |
+| 🗑️ | supprime le bloc courant |
+| menu Retirer un champ | supprime un champ precis du bloc courant |
 
 L'apercu est prive (ephemeral) et expire apres 30 minutes d'inactivite.
 
@@ -84,8 +90,25 @@ src/
 docs/                 site statique (GitHub Pages)
 ```
 
+## 6 bis. Plusieurs embeds et GIF
+
+Discord accepte **10 embeds par message** et **6000 caracteres au total** (titre, description,
+champs, auteur, footer confondus). Le bot et le site appliquent ces deux limites : au-dela, les
+derniers blocs sont retires et un avertissement s'affiche dans l'apercu.
+
+Pour un GIF, il faut **l'URL du fichier**, pas la page d'un site :
+
+- ✅ `https://media.giphy.com/media/xxxx/giphy.gif`
+- ✅ `https://i.imgur.com/xxxx.gif`
+- ❌ `https://tenor.com/view/...` (page HTML, Discord ne l'affiche pas)
+
+Sur Tenor ou Giphy : clic droit sur le GIF -> *Copier l'adresse de l'image*.
+Le site convertit automatiquement les liens Giphy et Imgur connus ; le bot fait de meme.
+
 ## Limites connues
 
 - Les apercus sont stockes en memoire : un redemarrage les vide.
 - Pas d'edition d'un embed deja publie.
+- La modale d'import est limitee a 4000 caracteres par Discord : un JSON de 2-3 gros embeds peut
+  depasser. Dans ce cas, importe le reste via un second `/embed import` ou allege les descriptions.
 - Le bot doit tourner quelque part (PC allume, VPS, Railway...) ; GitHub Pages n'heberge que le site.

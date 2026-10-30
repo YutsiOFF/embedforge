@@ -16,7 +16,7 @@ module.exports = {
     .addSubcommand((sub) =>
       sub
         .setName('import')
-        .setDescription('Importer un embed en JSON (exporte par le site web)'),
+        .setDescription('Importer un ou plusieurs embeds en JSON (exporte par le site web)'),
     )
     .addSubcommand((sub) =>
       sub.setName('aide').setDescription('Mode emploi du constructeur + lien du site'),
@@ -38,11 +38,17 @@ module.exports = {
       content: [
         "**EmbedForge - mode d'emploi**",
         '',
-        '**1.** `/embed create` -> titre, description, couleur, image, miniature.',
-        '**2.** Bouton `Ajouter un champ` -> jusqu a 25 champs (inline ou non).',
-        '**3.** Bouton `Auteur / Footer` -> auteur, footer, horodatage.',
-        '**4.** Bouton `JSON` -> recupere le JSON de l embed courant.',
-        '**5.** Bouton `Envoyer` -> choisis le salon de destination.',
+        '**1.** `/embed create` -> titre, description, couleur, image ou GIF, miniature.',
+        '**2.** `Ajouter un champ` -> jusqu a 25 champs (inline ou non).',
+        '**3.** `Ajouter un embed` -> empile un second bloc, jusqu a 10 par message.',
+        '**4.** Fleches `◀ ▶` -> passe d un embed a l autre, `Modifier` edite le bloc courant.',
+        '**5.** `Auteur / Footer` -> auteur, footer, horodatage.',
+        '**6.** `JSON` -> recupere tout le message en JSON.',
+        '**7.** `Envoyer` -> choisis le salon : les embeds partent ensemble.',
+        '',
+        '**GIF** : colle l URL directe du fichier (`.gif`, `.webp` ou `.apng`).',
+        'Sur Tenor ou Giphy, clic droit sur le GIF -> *Copier l adresse de l image*.',
+        'Les liens de page (`tenor.com/view/...`) ne s affichent pas : Discord veut le fichier.',
         '',
         `Constructeur visuel : ${SITE_URL}`,
         'Le JSON du site se colle directement via `/embed import`.',

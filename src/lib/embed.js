@@ -8,11 +8,46 @@ const LIMITS = {
   fieldName: 256,
   fieldValue: 1024,
   fields: 25,
+  embeds: 10,
   total: 6000,
 };
 
+const GIF_EXTENSIONS = /\.(gif|webp|apng)(\?\S*)?$/i;
+
 function isUrl(value) {
   return /^https?:\/\/\S+$/i.test(String(value ?? '').trim());
+}
+
+function isGifUrl(value) {
+  return isUrl(value) && GIF_EXTENSIONS.test(String(value).trim());
+}
+
+/**
+ * Discord n'affiche pas les pages Giphy / Imgur : il faut l'URL directe du media.
+ * On convertit ce qu'on sait convertir, le reste est signale a l'utilisateur.
+ */
+function gifify(value) {
+  const url = String(value ?? '').trim();
+  if (!url) return '';
+
+  const giphyMedia = url.match(/^(https?:\/\/media\d*\.giphy\.com\/media\/([a-zA-Z0-9]+)\/[^\s?#]*)/i);
+  if (giphyMedia) return `https://media.giphy.com/media/${giphyMedia[2]}/giphy.gif`;
+
+  const giphyPage = url.match(/^https?:\/\/(?:www\.)?giphy\.com\/(?:gifs|stickers)\/(?:[^?#]*?-)?([a-zA-Z0-9]+)\/?(?:[?#].*)?$/i);
+  if (giphyPage) return `https://media.giphy.com/media/${giphyPage[1]}/giphy.gif`;
+
+  const imgurPage = url.match(/^https?:\/\/(?:www\.|i\.)?imgur\.com\/([a-zA-Z0-9]+)\/?(?:[?#].*)?$/i);
+  if (imgurPage && !/\.(png|jpe?g|gif|webp)$/i.test(url)) {
+    return `https://i.imgur.com/${imgurPage[1]}.gif`;
+  }
+
+  return url;
+}
+
+function isMediaPage(url) {
+  return /^https?:\/\/(?:www\.)?(tenor\.com|giphy\.com|imgur\.com|gifer\.com|gifox?\.app)\//i.test(
+    String(url ?? '').trim(),
+  );
 }
 
 function parseColor(value) {
@@ -79,16 +114,22 @@ function sanitize(input = {}) {
     if (isUrl(input.author?.icon_url)) embed.author.icon_url = String(input.author.icon_url).trim();
   }
 
-  const thumbnail = String(input.thumbnail?.url ?? '').trim();
-  if (thumbnail) {
+  const rawThumbnail = String(input.thumbnail?.url ?? input.thumbnail ?? '').trim();
+  if (rawThumbnail) {
+    const thumbnail = gifify(rawThumbnail);
     if (isUrl(thumbnail)) embed.thumbnail = { url: thumbnail };
     else warn('URL de miniature ignoree.');
+    if (isMediaPage(thumbnail)) warn('Miniature : utilise l URL directe du GIF (clic droit > Copier l adresse de l image).');
   }
 
-  const image = String(input.image?.url ?? '').trim();
-  if (image) {
+  const rawImage = String(input.image?.url ?? input.image ?? input.gif ?? '').trim();
+  if (rawImage) {
+    const image = gifify(rawImage);
     if (isUrl(image)) embed.image = { url: image };
     else warn("URL d'image ignoree.");
+    if (isMediaPage(image)) {
+      warn('GIF : Discord veut l URL directe du fichier, pas la page Tenor/Giphy.');
+    }
   }
 
   const footerText = String(input.footer?.text ?? '').trim();
@@ -132,6 +173,36 @@ function sanitize(input = {}) {
   return { embed, warnings };
 }
 
+/**
+ * Plusieurs embeds dans un seul message (10 max, 6000 caracteres au total).
+ */
+function sanitizeMany(inputs = []) {
+  const list = Array.isArray(inputs) ? inputs : [inputs];
+  const warnings = [];
+  const warn = (message) => {
+    if (!warnings.includes(message)) warnings.push(message);
+  };
+
+  if (list.length > LIMITS.embeds) warn('10 embeds maximum par message : les suivants sont ignores.');
+
+  const embeds = [];
+  for (const input of list.slice(0, LIMITS.embeds)) {
+    const { embed, warnings: local } = sanitize(input);
+    local.forEach(warn);
+    if (!isEmpty(embed)) embeds.push(embed);
+  }
+
+  let guard = 0;
+  while (embeds.reduce((sum, embed) => sum + totalLength(embed), 0) > LIMITS.total && embeds.length > 1) {
+    embeds.pop();
+    warn('Trop de texte : les derniers embeds sont retires (6000 caracteres au total).');
+    guard += 1;
+    if (guard > LIMITS.embeds) break;
+  }
+
+  return { embeds, warnings };
+}
+
 function isEmpty(embed) {
   return !embed || Object.keys(embed).length === 0;
 }
@@ -139,9 +210,12 @@ function isEmpty(embed) {
 module.exports = {
   LIMITS,
   sanitize,
+  sanitizeMany,
   isEmpty,
   parseColor,
   intToHex,
   isUrl,
+  isGifUrl,
+  gifify,
   totalLength,
 };

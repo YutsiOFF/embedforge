@@ -432,3 +432,85 @@ input[type="color"] {
 }
 
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- onglets d'embeds ---------- */
+.embed-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid hsl(var(--border));
+  border-radius: calc(var(--radius) - 2px);
+  background: hsl(var(--muted) / 0.3);
+}
+
+.embed-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 190px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 6px);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s, color .15s, border-color .15s;
+  outline: none;
+}
+
+.embed-tab:hover { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
+.embed-tab:focus-visible { box-shadow: 0 0 0 3px hsl(var(--ring) / 0.25); }
+
+.embed-tab.is-active {
+  background: hsl(var(--background));
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.06);
+}
+
+.embed-tab-index {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+  font-size: 10px;
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+
+.embed-tab.is-active .embed-tab-index { background: #5865f2; color: #fff; }
+
+.embed-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.embed-tab-x {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1;
+  opacity: .55;
+  flex: 0 0 auto;
+}
+
+.embed-tab-x:hover { background: hsl(var(--destructive) / 0.2); color: hsl(var(--destructive)); opacity: 1; }
+
+/* ---------- apercu multi-embeds ---------- */
+.dc-embed-wrap + .dc-embed-wrap { margin-top: 6px; }
+.dc-embed-flag {
+  font-size: 10px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--dc-muted);
+  margin: 6px 0 2px;
+}
+.dc-embed-wrap.is-active .dc-embed { outline: 1px dashed hsl(var(--ring) / 0.45); outline-offset: 1px; }
+.dc-embed-wrap.is-active .dc-embed-flag { color: #5865f2; font-weight: 600; }

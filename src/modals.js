@@ -29,10 +29,13 @@ function input(id, label, options = {}) {
   return new ActionRowBuilder().addComponents(builder);
 }
 
-function createModal(data = {}) {
+function createModal(data = {}, options = {}) {
+  const customId = options.customId || 'embmodal:create';
+  const title = options.title || 'Construire un embed';
+
   return new ModalBuilder()
-    .setCustomId('embmodal:create')
-    .setTitle('Construire un embed')
+    .setCustomId(customId)
+    .setTitle(title)
     .addComponents(
       input('title', 'Titre', { value: data.title, maxLength: 256 }),
       input('description', 'Description', {
@@ -46,8 +49,12 @@ function createModal(data = {}) {
         maxLength: 7,
         placeholder: '#5865F2',
       }),
-      input('image', 'Image (URL https://...)', { value: data.image?.url, maxLength: 512 }),
-      input('thumbnail', 'Miniature (URL https://...)', {
+      input('image', 'Image ou GIF (URL)', {
+        value: data.image?.url,
+        maxLength: 512,
+        placeholder: 'https://media.giphy.com/media/xxxx/giphy.gif',
+      }),
+      input('thumbnail', 'Miniature (URL)', {
         value: data.thumbnail?.url,
         maxLength: 512,
       }),
@@ -98,13 +105,13 @@ function metaModal(data = {}) {
 function importModal() {
   return new ModalBuilder()
     .setCustomId('embmodal:import')
-    .setTitle('Importer un embed (JSON)')
+    .setTitle('Importer des embeds (JSON)')
     .addComponents(
-      input('json', 'Colle le JSON exporte par le site', {
+      input('json', 'JSON du site (un embed ou une liste)', {
         style: TextInputStyle.Paragraph,
         required: true,
         maxLength: 4000,
-        placeholder: '{ "title": "Mon annonce", "color": 5793266 }',
+        placeholder: '{ "title": "Mon annonce" } ou { "embeds": [ ... ] }',
       }),
     );
 }

@@ -10,6 +10,7 @@
     footer: 2048,
     author: 256,
     total: 6000,
+    embeds: 10,
   };
 
   const DEFAULT_COLOR = '#5865f2';
@@ -29,7 +30,8 @@
     fields: [],
   });
 
-  let state = blank();
+  const doc = { embeds: [blank()], active: 0 };
+  let state = doc.embeds[0];
 
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -61,6 +63,27 @@
 
   const isUrl = (value) => /^https?:\/\/\S+$/i.test(String(value ?? '').trim());
 
+  /** Tenor / Giphy / Imgur : Discord exige le fichier, pas la page. */
+  function gifify(value) {
+    const url = String(value ?? '').trim();
+    if (!url) return '';
+
+    const giphyMedia = url.match(/^(https?:\/\/media\d*\.giphy\.com\/media\/([a-zA-Z0-9]+)\/[^\s?#]*)/i);
+    if (giphyMedia) return `https://media.giphy.com/media/${giphyMedia[2]}/giphy.gif`;
+
+    const giphyPage = url.match(
+      /^https?:\/\/(?:www\.)?giphy\.com\/(?:gifs|stickers)\/(?:[^?#]*?-)?([a-zA-Z0-9]+)\/?(?:[?#].*)?$/i,
+    );
+    if (giphyPage) return `https://media.giphy.com/media/${giphyPage[1]}/giphy.gif`;
+
+    const imgurPage = url.match(/^https?:\/\/(?:www\.|i\.)?imgur\.com\/([a-zA-Z0-9]+)\/?(?:[?#].*)?$/i);
+    if (imgurPage && !/\.(png|jpe?g|gif|webp)$/i.test(url)) {
+      return `https://i.imgur.com/${imgurPage[1]}.gif`;
+    }
+
+    return url;
+  }
+
   function hexToInt(value) {
     const match = String(value ?? '').trim().match(/^#?([0-9a-f]{6})$/i);
     return match ? parseInt(match[1], 16) : null;
@@ -75,7 +98,8 @@
     current[parts[parts.length - 1]] = value;
   }
 
-  const getPath = (object, path) => path.split('.').reduce((acc, key) => (acc ? acc[key] : undefined), object);
+  const getPath = (object, path) =>
+    path.split('.').reduce((acc, key) => (acc ? acc[key] : undefined), object);
 
   function totalLength(embed) {
     return (
@@ -87,37 +111,42 @@
     );
   }
 
-  function buildEmbed() {
+  /* ---------------- construction des embeds ---------------- */
+
+  function buildOne(data) {
     const embed = {};
 
-    const title = state.title.trim();
+    const title = String(data.title ?? '').trim();
     if (title) embed.title = title.slice(0, MAX.title);
 
-    const description = state.description.replace(/\r\n/g, '\n').trim();
+    const description = String(data.description ?? '').replace(/\r\n/g, '\n').trim();
     if (description) embed.description = description.slice(0, MAX.description);
 
-    if (isUrl(state.url)) embed.url = state.url.trim();
+    if (isUrl(data.url)) embed.url = String(data.url).trim();
 
-    const color = hexToInt(state.color);
+    const color = hexToInt(data.color);
     if (color !== null) embed.color = color;
 
-    if (state.author.name.trim()) {
-      embed.author = { name: state.author.name.trim().slice(0, MAX.author) };
-      if (isUrl(state.author.url)) embed.author.url = state.author.url.trim();
-      if (isUrl(state.author.icon_url)) embed.author.icon_url = state.author.icon_url.trim();
+    if (data.author?.name?.trim()) {
+      embed.author = { name: data.author.name.trim().slice(0, MAX.author) };
+      if (isUrl(data.author.url)) embed.author.url = data.author.url.trim();
+      if (isUrl(data.author.icon_url)) embed.author.icon_url = data.author.icon_url.trim();
     }
 
-    if (isUrl(state.thumbnail)) embed.thumbnail = { url: state.thumbnail.trim() };
-    if (isUrl(state.image)) embed.image = { url: state.image.trim() };
+    const thumbnail = gifify(data.thumbnail);
+    if (isUrl(thumbnail)) embed.thumbnail = { url: thumbnail };
 
-    if (state.footer.text.trim()) {
-      embed.footer = { text: state.footer.text.trim().slice(0, MAX.footer) };
-      if (isUrl(state.footer.icon_url)) embed.footer.icon_url = state.footer.icon_url.trim();
+    const image = gifify(data.image);
+    if (isUrl(image)) embed.image = { url: image };
+
+    if (data.footer?.text?.trim()) {
+      embed.footer = { text: data.footer.text.trim().slice(0, MAX.footer) };
+      if (isUrl(data.footer.icon_url)) embed.footer.icon_url = data.footer.icon_url.trim();
     }
 
-    if (state.timestamp) embed.timestamp = new Date().toISOString();
+    if (data.timestamp) embed.timestamp = new Date().toISOString();
 
-    const fields = state.fields
+    const fields = (data.fields || [])
       .filter((field) => field.name.trim() || field.value.trim())
       .slice(0, MAX.fields)
       .map((field) => ({
@@ -127,40 +156,136 @@
       }));
     if (fields.length) embed.fields = fields;
 
-    if (totalLength(embed) > MAX.total) {
-      while (totalLength(embed) > MAX.total && embed.fields?.length) embed.fields.pop();
-      if (!embed.fields?.length) delete embed.fields;
-      if (totalLength(embed) > MAX.total && embed.description) {
-        const overflow = totalLength(embed) - MAX.total;
-        embed.description = `${embed.description.slice(0, Math.max(0, embed.description.length - overflow - 3))}...`;
-      }
-    }
-
     return embed;
   }
 
-  function updatePreview() {
-    const embed = buildEmbed();
-    const total = totalLength(embed);
+  /** Tous les embeds non vides, avec l'index d'origine, dans le budget global de 6000. */
+  function buildItems() {
+    const items = [];
+    doc.embeds.forEach((data, index) => {
+      const embed = buildOne(data);
+      if (Object.keys(embed).length) items.push({ index, embed });
+    });
 
-    const badge = $('#char-badge');
-    badge.textContent = `${total} / ${MAX.total}`;
-    badge.classList.toggle('over', total > MAX.total);
-    $('#footer-total').textContent = `${total} caractere${total > 1 ? 's' : ''}`;
-
-    $('#counter-title').textContent = `${state.title.length} / ${MAX.title}`;
-    $('#counter-description').textContent = `${state.description.length} / ${MAX.description}`;
-    $('#counter-fields').textContent = `${state.fields.length} / ${MAX.fields} champs`;
-    $('#counter-fields').classList.toggle('over', state.fields.length > MAX.fields);
-
-    const preview = $('#preview');
-
-    if (!Object.keys(embed).length) {
-      preview.innerHTML =
-        '<div class="dc-empty">L\'apercu s\'affiche ici<br><span>Commence par un titre ou une description.</span></div>';
-      return;
+    let total = items.reduce((sum, item) => sum + totalLength(item.embed), 0);
+    while (total > MAX.total && items.length > 1) {
+      total -= totalLength(items.pop().embed);
     }
 
+    if (total > MAX.total && items.length) {
+      const last = items[items.length - 1].embed;
+      while (totalLength(last) > MAX.total && last.fields && last.fields.length) {
+        total -= last.fields[last.fields.length - 1].name.length +
+          last.fields[last.fields.length - 1].value.length;
+        last.fields.pop();
+      }
+      if (last.fields && !last.fields.length) delete last.fields;
+      if (totalLength(last) > MAX.total && last.description) {
+        const overflow = totalLength(last) - MAX.total;
+        last.description = `${last.description.slice(0, Math.max(0, last.description.length - overflow - 3))}...`;
+      }
+    }
+
+    return items;
+  }
+
+  const buildEmbeds = () => buildItems().map((item) => item.embed);
+
+  function exportPayload() {
+    const embeds = buildEmbeds();
+    if (!embeds.length) return {};
+    return embeds.length > 1 ? { embeds } : embeds[0];
+  }
+
+  /* ---------------- onglets ---------------- */
+
+  function setActive(index) {
+    doc.active = Math.min(Math.max(0, index), doc.embeds.length - 1);
+    state = doc.embeds[doc.active];
+    renderTabs();
+    syncInputs();
+    renderFields();
+    updatePreview();
+    save();
+  }
+
+  function setState(next) {
+    doc.embeds[doc.active] = next;
+    state = next;
+  }
+
+  function embeddingLabel(embed, index) {
+    const title = String(embed.title ?? '').trim();
+    return title ? title.slice(0, 24) : `Embed ${index + 1}`;
+  }
+
+  function renderTabs() {
+    const tabs = $('#embed-tabs');
+    if (!tabs) return;
+
+    tabs.innerHTML = doc.embeds
+      .map(
+        (embed, index) =>
+          `<div class="embed-tab${index === doc.active ? ' is-active' : ''}" data-embed="${index}" ` +
+          `role="button" tabindex="0" title="${escAttr(embeddingLabel(embed, index))}">` +
+          `<span class="embed-tab-index">${index + 1}</span>` +
+          `<span class="embed-tab-name">${escHtml(embeddingLabel(embed, index))}</span>` +
+          (doc.embeds.length > 1
+            ? `<span class="embed-tab-x" data-remove="${index}" title="Supprimer cet embed">&times;</span>`
+            : '') +
+          '</div>',
+      )
+      .join('');
+
+    const counter = $('#counter-embeds');
+    if (counter) {
+      counter.textContent = `${doc.embeds.length} / ${MAX.embeds} embeds`;
+      counter.classList.toggle('over', doc.embeds.length > MAX.embeds);
+    }
+
+    const addButton = $('#add-embed');
+    if (addButton) addButton.disabled = doc.embeds.length >= MAX.embeds;
+    const removeButton = $('#remove-embed');
+    if (removeButton) removeButton.disabled = doc.embeds.length <= 1;
+  }
+
+  function addEmbed(copyCurrent) {
+    if (doc.embeds.length >= MAX.embeds) {
+      toast('10 embeds maximum par message');
+      return;
+    }
+    const next = copyCurrent ? JSON.parse(JSON.stringify(state)) : blank();
+    doc.embeds.push(next);
+    doc.active = doc.embeds.length - 1;
+    state = next;
+    renderTabs();
+    syncInputs();
+    renderFields();
+    updatePreview();
+    save();
+    toast(copyCurrent ? 'Embed duplique' : 'Embed ajoute');
+  }
+
+  function removeEmbed(index) {
+    if (doc.embeds.length <= 1) {
+      toast('Il faut garder au moins un embed');
+      return;
+    }
+    doc.embeds.splice(index, 1);
+    doc.active = Math.min(doc.active >= index ? doc.active - 1 : doc.active, doc.embeds.length - 1);
+    doc.active = Math.max(0, doc.active);
+    state = doc.embeds[doc.active];
+    renderTabs();
+    syncInputs();
+    renderFields();
+    updatePreview();
+    save();
+    toast('Embed supprime');
+  }
+
+  /* ---------------- apercu ---------------- */
+
+  function renderEmbed(embed, isActive, label) {
     const colorHex = typeof embed.color === 'number' ? intToHex(embed.color) : DEFAULT_COLOR;
     const parts = [];
 
@@ -209,10 +334,47 @@
       ? `<div class="dc-thumb"><img src="${escAttr(embed.thumbnail.url)}" alt=""></div>`
       : '';
 
-    preview.innerHTML =
+    return (
+      `<div class="dc-embed-wrap${isActive ? ' is-active' : ''}">` +
+      (label ? `<div class="dc-embed-flag">${escHtml(label)}</div>` : '') +
       `<div class="dc-embed" style="border-left-color:${colorHex}">` +
       `<div class="dc-embed-body">${thumb}<div class="dc-embed-main">${parts.join('')}</div></div>` +
-      '</div>';
+      '</div></div>'
+    );
+  }
+
+  function updatePreview() {
+    const items = buildItems();
+    const total = items.reduce((sum, item) => sum + totalLength(item.embed), 0);
+
+    const badge = $('#char-badge');
+    badge.textContent = `${total} / ${MAX.total}`;
+    badge.classList.toggle('over', total > MAX.total);
+    $('#footer-total').textContent =
+      `${total} caractere${total > 1 ? 's' : ''} - ${doc.embeds.length} embed${doc.embeds.length > 1 ? 's' : ''}`;
+
+    $('#counter-title').textContent = `${state.title.length} / ${MAX.title}`;
+    $('#counter-description').textContent = `${state.description.length} / ${MAX.description}`;
+    $('#counter-fields').textContent = `${state.fields.length} / ${MAX.fields} champs`;
+    $('#counter-fields').classList.toggle('over', state.fields.length > MAX.fields);
+
+    const preview = $('#preview');
+
+    if (!items.length) {
+      preview.innerHTML =
+        '<div class="dc-empty">L\'apercu s\'affiche ici<br><span>Commence par un titre ou une description.</span></div>';
+      return;
+    }
+
+    preview.innerHTML = items
+      .map((item) =>
+        renderEmbed(
+          item.embed,
+          item.index === doc.active,
+          items.length > 1 ? `Embed ${item.index + 1}` : '',
+        ),
+      )
+      .join('');
   }
 
   /* ---------------- editeur de champs ---------------- */
@@ -258,6 +420,7 @@
       nameInput.addEventListener('input', function () {
         state.fields[index].name = nameInput.value;
         updatePreview();
+        renderTabs();
         save();
       });
 
@@ -277,6 +440,7 @@
         state.fields.splice(index, 1);
         renderFields();
         updatePreview();
+        renderTabs();
         save();
       });
 
@@ -332,8 +496,24 @@
       if (!element) return;
       element.addEventListener('input', function () {
         setPath(state, pair[1], element.value);
+        if (pair[0] === 'title') renderTabs();
         updatePreview();
         save();
+      });
+    });
+
+    ['image', 'thumbnail'].forEach(function (id) {
+      const element = document.getElementById(id);
+      if (!element) return;
+      element.addEventListener('change', function () {
+        const next = gifify(element.value);
+        if (next !== element.value) {
+          element.value = next;
+          state[id] = next;
+          updatePreview();
+          save();
+          toast('Lien GIF converti en fichier direct');
+        }
       });
     });
 
@@ -403,31 +583,17 @@
   }
 
   function download() {
-    const blob = new Blob([JSON.stringify(buildEmbed(), null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(exportPayload(), null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'embed.json';
+    link.download = doc.embeds.length > 1 ? 'embeds.json' : 'embed.json';
     link.click();
     URL.revokeObjectURL(url);
-    toast('embed.json telecharge');
+    toast('Fichier telecharge');
   }
 
-  function importJson(raw) {
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (error) {
-      toast('JSON invalide');
-      return;
-    }
-
-    const candidate = Array.isArray(parsed && parsed.embeds) ? parsed.embeds[0] : (parsed && parsed.embed) || parsed;
-    if (!candidate || typeof candidate !== 'object') {
-      toast('Aucun embed trouve');
-      return;
-    }
-
+  function fromApi(candidate) {
     const next = blank();
     next.title = candidate.title || '';
     next.description = candidate.description || '';
@@ -443,8 +609,15 @@
       next.author.url = candidate.author.url || '';
       next.author.icon_url = candidate.author.icon_url || '';
     }
-    next.thumbnail = (candidate.thumbnail && candidate.thumbnail.url) || '';
-    next.image = (candidate.image && candidate.image.url) || '';
+    next.thumbnail =
+      (candidate.thumbnail && candidate.thumbnail.url) ||
+      (typeof candidate.thumbnail === 'string' ? candidate.thumbnail : '') ||
+      '';
+    next.image =
+      (candidate.image && candidate.image.url) ||
+      (typeof candidate.image === 'string' ? candidate.image : '') ||
+      candidate.gif ||
+      '';
     if (candidate.footer) {
       next.footer.text = candidate.footer.text || '';
       next.footer.icon_url = candidate.footer.icon_url || '';
@@ -459,21 +632,65 @@
           };
         })
       : [];
+    return next;
+  }
 
-    state = next;
+  function importJson(raw) {
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      toast('JSON invalide');
+      return;
+    }
+
+    let candidates = [];
+    if (Array.isArray(parsed)) candidates = parsed;
+    else if (Array.isArray(parsed && parsed.embeds)) candidates = parsed.embeds;
+    else if (parsed && parsed.embed && typeof parsed.embed === 'object') candidates = [parsed.embed];
+    else if (parsed && typeof parsed === 'object') candidates = [parsed];
+
+    candidates = candidates.filter((item) => item && typeof item === 'object');
+
+    if (!candidates.length) {
+      toast('Aucun embed trouve');
+      return;
+    }
+    if (candidates.length > MAX.embeds) {
+      toast(`10 embeds maximum : ${candidates.length} trouves`);
+      candidates = candidates.slice(0, MAX.embeds);
+    }
+
+    doc.embeds = candidates.map(fromApi);
+    doc.active = 0;
+    state = doc.embeds[0];
+    renderTabs();
     syncInputs();
     renderFields();
     updatePreview();
     save();
-    toast('JSON importe');
+    toast(`${doc.embeds.length} embed${doc.embeds.length > 1 ? 's' : ''} importe${doc.embeds.length > 1 ? 's' : ''}`);
   }
 
   function save() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ v: 2, embeds: doc.embeds, active: doc.active }),
+      );
     } catch (error) {
       /* stockage indisponible */
     }
+  }
+
+  function hydrate(raw) {
+    const base = blank();
+    return Object.assign({}, base, raw, {
+      author: Object.assign({}, base.author, raw.author || {}),
+      footer: Object.assign({}, base.footer, raw.footer || {}),
+      fields: Array.isArray(raw.fields) ? raw.fields : [],
+      color: typeof raw.color === 'string' ? raw.color : DEFAULT_COLOR,
+    });
   }
 
   function load() {
@@ -481,14 +698,19 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      const base = blank();
-      state = Object.assign({}, base, parsed, {
-        author: Object.assign({}, base.author, parsed.author || {}),
-        footer: Object.assign({}, base.footer, parsed.footer || {}),
-        fields: Array.isArray(parsed.fields) ? parsed.fields : [],
-      });
+
+      if (parsed && parsed.v === 2 && Array.isArray(parsed.embeds) && parsed.embeds.length) {
+        doc.embeds = parsed.embeds.slice(0, MAX.embeds).map(hydrate);
+        doc.active = Math.min(Math.max(0, parsed.active | 0), doc.embeds.length - 1);
+      } else if (parsed && typeof parsed === 'object') {
+        doc.embeds = [hydrate(parsed)];
+        doc.active = 0;
+      }
+      state = doc.embeds[doc.active];
     } catch (error) {
-      state = blank();
+      doc.embeds = [blank()];
+      doc.active = 0;
+      state = doc.embeds[0];
     }
   }
 
@@ -611,6 +833,7 @@
     initTheme();
     initSwatches();
     load();
+    renderTabs();
     syncInputs();
     bindInputs();
     renderFields();
@@ -621,7 +844,8 @@
       if (!button) return;
       const factory = templates[button.dataset.template];
       if (!factory) return;
-      state = factory();
+      setState(factory());
+      renderTabs();
       syncInputs();
       renderFields();
       updatePreview();
@@ -629,25 +853,64 @@
       toast('Modele charge');
     });
 
+    $('#embed-tabs').addEventListener('click', function (event) {
+      const close = event.target.closest('[data-remove]');
+      if (close) {
+        event.stopPropagation();
+        removeEmbed(Number(close.dataset.remove));
+        return;
+      }
+      const tab = event.target.closest('[data-embed]');
+      if (tab) setActive(Number(tab.dataset.embed));
+    });
+
+    $('#embed-tabs').addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const tab = event.target.closest('[data-embed]');
+      if (!tab) return;
+      event.preventDefault();
+      setActive(Number(tab.dataset.embed));
+    });
+
+    $('#add-embed').addEventListener('click', function () {
+      addEmbed(false);
+    });
+
+    $('#duplicate-embed').addEventListener('click', function () {
+      addEmbed(true);
+    });
+
+    $('#remove-embed').addEventListener('click', function () {
+      removeEmbed(doc.active);
+    });
+
     $('#copy-json').addEventListener('click', function () {
-      copy(JSON.stringify(buildEmbed(), null, 2), 'JSON copie');
+      copy(JSON.stringify(exportPayload(), null, 2), 'JSON copie');
     });
 
     $('#copy-code').addEventListener('click', function () {
+      const embeds = buildEmbeds();
       const code =
         "const { EmbedBuilder } = require('discord.js');\n" +
-        'await channel.send({ embeds: [EmbedBuilder.from(' +
-        JSON.stringify(buildEmbed(), null, 2) +
-        ')] });';
+        'await channel.send({\n  embeds: [\n' +
+        embeds
+          .map(function (embed) {
+            return '    EmbedBuilder.from(' + JSON.stringify(embed, null, 2).replace(/\n/g, '\n    ') + ')';
+          })
+          .join(',\n') +
+        '\n  ],\n});';
       copy(code, 'Code discord.js copie');
     });
 
     $('#download').addEventListener('click', download);
 
     $('#reset').addEventListener('click', function () {
-      if (!window.confirm('Reinitialiser le constructeur ?')) return;
-      state = blank();
+      if (!window.confirm('Reinitialiser tout le message ?')) return;
+      doc.embeds = [blank()];
+      doc.active = 0;
+      state = doc.embeds[0];
       $('#import-json').value = '';
+      renderTabs();
       syncInputs();
       renderFields();
       updatePreview();

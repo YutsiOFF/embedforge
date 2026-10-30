@@ -30,7 +30,7 @@
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">Modeles</h2>
-          <p class="card-desc">Un point de depart, puis personnalise tout.</p>
+        <p class="card-desc">Remplace l'embed selectionne par un point de depart.</p>
         </div>
         <div class="card-content templates" id="templates">
           <button class="btn btn-secondary btn-sm" data-template="annonce">&#128227; Annonce</button>
@@ -38,6 +38,23 @@
           <button class="btn btn-secondary btn-sm" data-template="maj">&#128640; Mise a jour</button>
           <button class="btn btn-secondary btn-sm" data-template="sondage">&#128202; Sondage</button>
           <button class="btn btn-secondary btn-sm" data-template="profil">&#129706; Profil</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Embeds du message</h2>
+          <p class="card-desc">Jusqu'a 10 blocs empiles dans un seul message, comme sur Discord.</p>
+        </div>
+        <div class="card-content stack-sm">
+          <div class="embed-tabs" id="embed-tabs"></div>
+          <div class="row">
+            <button class="btn btn-primary btn-sm" id="add-embed">Ajouter un embed</button>
+            <button class="btn btn-outline btn-sm" id="duplicate-embed">Dupliquer</button>
+            <button class="btn btn-ghost btn-sm" id="remove-embed">Supprimer</button>
+          </div>
+          <p class="counter" id="counter-embeds">1 / 10 embeds</p>
+          <p class="hint">Les modifs ci-dessous concernent l'embed selectionne dans les onglets.</p>
         </div>
       </div>
 
@@ -84,15 +101,15 @@
               <div class="swatches" id="swatches"></div>
             </div>
             <div class="field">
-              <label class="label" for="image">Image (grande)</label>
-              <input class="input" id="image" placeholder="https://exemple.com/image.png">
-              <p class="hint">Affichee sous le contenu.</p>
+              <label class="label" for="image">Image ou GIF (URL)</label>
+              <input class="input" id="image" placeholder="https://media.giphy.com/media/xxxx/giphy.gif">
+              <p class="hint">Grande image sous le contenu. Un <code>.gif</code>, <code>.webp</code> ou <code>.apng</code> s'anime.</p>
             </div>
           </div>
           <div class="field">
-            <label class="label" for="thumbnail">Miniature</label>
+            <label class="label" for="thumbnail">Miniature (URL)</label>
             <input class="input" id="thumbnail" placeholder="https://exemple.com/miniature.png">
-            <p class="hint">Petite image a droite du contenu.</p>
+            <p class="hint">Petite image a droite du contenu. Les liens de page Tenor/Giphy sont convertis quand c'est possible.</p>
           </div>
         </div>
       </div>
@@ -161,7 +178,7 @@
             <button class="btn btn-outline btn-sm" id="import-btn">Charger ce JSON</button>
             <button class="btn btn-ghost btn-sm" id="clear-btn">Vider</button>
           </div>
-          <p class="hint">Fonctionne aussi avec <code>{ "embeds": [ ... ] }</code>.</p>
+          <p class="hint">Accepte un seul embed, une liste <code>[ ... ]</code> ou <code>{ "embeds": [ ... ] }</code> : 10 embeds max, 6000 caracteres au total.</p>
         </div>
       </div>
     </section>
