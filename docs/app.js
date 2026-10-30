@@ -246,9 +246,15 @@
           `<div class="embed-tab${index === doc.active ? ' is-active' : ''}" data-embed="${index}" ` +
           `role="button" tabindex="0" title="${escAttr(embeddingLabel(embed, index))}">` +
           `<span class="embed-tab-index">${index + 1}</span>` +
+          (doc.embeds.length > 1
+            ? `<span class="embed-tab-move${index === 0 ? ' is-off' : ''}" data-move="-1" data-from="${index}" ` +
+              `title="Deplacer vers la gauche">\u2039</span>`
+            : '') +
           `<span class="embed-tab-name">${escHtml(embeddingLabel(embed, index))}</span>` +
           (doc.embeds.length > 1
-            ? `<span class="embed-tab-x" data-remove="${index}" title="Supprimer cet embed">&times;</span>`
+            ? `<span class="embed-tab-move${index === doc.embeds.length - 1 ? ' is-off' : ''}" data-move="1" data-from="${index}" ` +
+              `title="Deplacer vers la droite">\u203A</span>` +
+              `<span class="embed-tab-x" data-remove="${index}" title="Supprimer cet embed">&times;</span>`
             : '') +
           '</div>',
       )
@@ -298,6 +304,23 @@
     updatePreview();
     save();
     toast('Embed supprime');
+  }
+
+  function moveEmbed(index, delta) {
+    const target = index + delta;
+    if (target < 0 || target >= doc.embeds.length) return;
+
+    const activeEmbed = doc.embeds[doc.active];
+    const [item] = doc.embeds.splice(index, 1);
+    doc.embeds.splice(target, 0, item);
+
+    doc.active = Math.max(0, doc.embeds.indexOf(activeEmbed));
+    state = doc.embeds[doc.active];
+    renderTabs();
+    renderFields();
+    updatePreview();
+    save();
+    toast(delta < 0 ? 'Embed deplace vers la gauche' : 'Embed deplace vers la droite');
   }
 
   /* ---------------- apercu ---------------- */
@@ -1116,6 +1139,14 @@
     });
 
     $('#embed-tabs').addEventListener('click', function (event) {
+      const move = event.target.closest('[data-move]');
+      if (move) {
+        event.stopPropagation();
+        if (!move.classList.contains('is-off')) {
+          moveEmbed(Number(move.dataset.from), Number(move.dataset.move));
+        }
+        return;
+      }
       const close = event.target.closest('[data-remove]');
       if (close) {
         event.stopPropagation();

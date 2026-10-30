@@ -397,6 +397,33 @@ input[type="color"] {
 .dc-footer img { width: 18px; height: 18px; border-radius: 999px; object-fit: cover; }
 
 .preview-card .card-content { display: flex; flex-direction: column; gap: 12px; }
+.embed-tab-move {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.embed-tab-move:hover {
+  background: hsl(var(--foreground) / 0.1);
+  color: hsl(var(--foreground));
+}
+
+.embed-tab-move.is-off {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.embed-tab-move.is-off:hover {
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+}
 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .actions #copy-json { grid-column: 1 / -1; }
 
