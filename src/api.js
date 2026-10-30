@@ -35,12 +35,16 @@ let cleanTimer = null;
 
 function resolveConfig() {
   const port = Number(process.env.API_PORT || 3000);
+  const safePort = Number.isFinite(port) && port > 0 ? port : 3000;
+  const publicUrl = String(process.env.API_PUBLIC_URL || `http://localhost:${safePort}`).replace(/\/+$/, '');
   return {
-    port: Number.isFinite(port) && port > 0 ? port : 3000,
+    port: safePort,
     clientId: String(process.env.CLIENT_ID || '').trim(),
     clientSecret: String(process.env.DISCORD_CLIENT_SECRET || '').trim(),
     siteUrl: String(process.env.SITE_URL || '').trim().replace(/\/+$/, ''),
-    publicUrl: String(process.env.API_PUBLIC_URL || `http://localhost:${port}`).replace(/\/+$/, ''),
+    publicUrl,
+    // Doit correspondre EXACTEMENT a une Redirect URL du portail Discord.
+    redirectUri: String(process.env.DISCORD_REDIRECT_URI || `${publicUrl}/auth/discord/callback`).trim(),
   };
 }
 
@@ -135,7 +139,7 @@ function startLogin(res, config) {
 
   const target = new URL('https://discord.com/oauth2/authorize');
   target.searchParams.set('client_id', config.clientId);
-  target.searchParams.set('redirect_uri', `${config.publicUrl}/auth/discord/callback`);
+  target.searchParams.set('redirect_uri', config.redirectUri);
   target.searchParams.set('response_type', 'code');
   target.searchParams.set('scope', 'identify guilds');
   target.searchParams.set('state', state);
@@ -170,7 +174,7 @@ async function finishLogin(res, url, config) {
         client_secret: config.clientSecret,
         grant_type: 'authorization_code',
         code,
-        redirect_uri: `${config.publicUrl}/auth/discord/callback`,
+        redirect_uri: config.redirectUri,
       }),
       signal: AbortSignal.timeout(10000),
     });
@@ -472,6 +476,12 @@ async function handle(req, res, client, config) {
   const url = new URL(req.url, 'http://localhost');
   const path = url.pathname.replace(/\/+$/, '') || '/';
 
+  // Retour OAuth : si la Redirect URL enregistree est la racine du serveur,
+  // Discord revient sur `/` avec code + state.
+  if (path === '/' && (url.searchParams.has('code') || url.searchParams.has('error')) && url.searchParams.has('state')) {
+    return finishLogin(res, url, config);
+  }
+
   if (path === '/' || path === '/api/health') {
     return sendJson(res, 200, {
       ok: true,
@@ -484,6 +494,7 @@ async function handle(req, res, client, config) {
   }
   if (path === '/auth/discord') return startLogin(res, config);
   if (path === '/auth/discord/callback') return finishLogin(res, url, config);
+  if (path === '/auth/callback') return finishLogin(res, url, config);
   if (path === '/api/me') return whoAmI(req, res, client);
   if (path === '/api/logout') return logout(req, res);
   if (path === '/api/session' && req.method === 'POST') return createCodeSession(req, res, client);
@@ -525,7 +536,7 @@ function startApi(client) {
     console.log(`[api] http://localhost:${config.port}`);
     console.log(
       config.clientSecret
-        ? `[api] envoi web actif - callback : ${config.publicUrl}/auth/discord/callback`
+        ? `[api] envoi web actif - redirect URI : ${config.redirectUri}`
         : '[api] envoi web desactive : ajoute DISCORD_CLIENT_SECRET dans .env',
     );
   });
