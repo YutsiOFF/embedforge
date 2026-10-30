@@ -171,12 +171,41 @@
         value: (field.value.trim() || '\u200b').slice(0, MAX.fieldValue),
         inline: Boolean(field.inline),
       }));
-    if (fields.length) embed.fields = fields;
+    const aligned = alignFields(fields);
+    if (aligned.length) embed.fields = aligned;
 
     return embed;
   }
 
   /** Tous les embeds non vides, avec l'index d'origine, dans le budget global de 6000. */
+  /**
+   * Discord range les champs inline par lignes de 3 : un reste incomplet laisse
+   * une colonne vide et des valeurs mal alignees. On repasse ce reste en pleine
+   * largeur (desactivable via l'option « Champs alignes »).
+   */
+  function alignFields(fields) {
+    if (doc.alignFields === false) return fields;
+
+    const out = fields.map((field) => Object.assign({}, field));
+    let run = [];
+
+    const flush = function () {
+      const rest = run.length % 3;
+      for (let i = run.length - rest; i < run.length && rest; i += 1) {
+        out[run[i]].inline = false;
+      }
+      run = [];
+    };
+
+    out.forEach(function (field, index) {
+      if (field.inline) run.push(index);
+      else flush();
+    });
+    flush();
+
+    return out;
+  }
+
   function buildItems() {
     const items = [];
     doc.embeds.forEach((data, index) => {
@@ -1176,6 +1205,17 @@
     $('#remove-embed').addEventListener('click', function () {
       removeEmbed(doc.active);
     });
+
+    const alignToggle = $('#align-fields');
+    if (alignToggle) {
+      alignToggle.checked = doc.alignFields !== false;
+      alignToggle.addEventListener('change', function () {
+        doc.alignFields = alignToggle.checked;
+        updatePreview();
+        save();
+        toast(alignToggle.checked ? 'Champs alignes' : 'Alignement libre');
+      });
+    }
 
     $('#copy-json').addEventListener('click', function () {
       copy(JSON.stringify(exportPayload(), null, 2), 'JSON copie');
