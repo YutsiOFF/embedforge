@@ -16,6 +16,10 @@
   const DEFAULT_COLOR = '#5865f2';
   const STORAGE_KEY = 'embedforge.state';
   const STORAGE_THEME = 'embedforge.theme';
+  const STORAGE_API = 'embedforge.api';
+  const STORAGE_TOKEN = 'embedforge.token';
+
+  let session = null;
 
   const blank = () => ({
     title: '',
@@ -91,6 +95,16 @@
 
   const intToHex = (value) => `#${Number(value).toString(16).padStart(6, '0')}`;
 
+  function toLocalInput(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = (number) => String(number).padStart(2, '0');
+    return (
+      `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+      `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+    );
+  }
+
   function setPath(object, path, value) {
     const parts = path.split('.');
     let current = object;
@@ -144,7 +158,10 @@
       if (isUrl(data.footer.icon_url)) embed.footer.icon_url = data.footer.icon_url.trim();
     }
 
-    if (data.timestamp) embed.timestamp = new Date().toISOString();
+    if (data.timestamp) {
+      const date = data.timestamp === true ? new Date() : new Date(data.timestamp);
+      if (!Number.isNaN(date.getTime())) embed.timestamp = date.toISOString();
+    }
 
     const fields = (data.fields || [])
       .filter((field) => field.name.trim() || field.value.trim())
@@ -405,6 +422,7 @@
         `<button class="btn btn-icon btn-sm btn-ghost" data-role="down" title="Descendre" ${
           index === state.fields.length - 1 ? 'disabled' : ''
         }>&#8595;</button>` +
+        '<button class="btn btn-icon btn-sm btn-ghost" data-role="duplicate" title="Dupliquer">&#10697;</button>' +
         '<button class="btn btn-icon btn-sm btn-ghost danger" data-role="remove" title="Supprimer">&#10005;</button>' +
         '</div></div>' +
         `<input class="input" data-role="name" maxlength="${MAX.fieldName}" placeholder="Nom du champ" value="${escAttr(
@@ -444,6 +462,17 @@
         save();
       });
 
+      row.querySelector('[data-role="duplicate"]').addEventListener('click', function () {
+        if (state.fields.length >= MAX.fields) {
+          toast('25 champs maximum');
+          return;
+        }
+        state.fields.splice(index + 1, 0, JSON.parse(JSON.stringify(state.fields[index])));
+        renderFields();
+        updatePreview();
+        save();
+      });
+
       row.querySelector('[data-role="up"]').addEventListener('click', function () {
         if (index === 0) return;
         const moved = state.fields.splice(index, 1)[0];
@@ -473,6 +502,7 @@
     ['url', 'url'],
     ['description', 'description'],
     ['author-name', 'author.name'],
+    ['author-url', 'author.url'],
     ['author-icon', 'author.icon_url'],
     ['image', 'image'],
     ['thumbnail', 'thumbnail'],
@@ -488,6 +518,8 @@
     $('#color-hex').value = state.color;
     $('#color-picker').value = /^#[0-9a-f]{6}$/i.test(state.color) ? state.color : DEFAULT_COLOR;
     $('#timestamp').checked = Boolean(state.timestamp);
+    $('#timestamp-date').value = typeof state.timestamp === 'string' ? toLocalInput(state.timestamp) : '';
+    $('#timestamp-date').disabled = !state.timestamp;
   }
 
   function bindInputs() {
@@ -532,7 +564,27 @@
     });
 
     $('#timestamp').addEventListener('change', function (event) {
-      state.timestamp = event.target.checked;
+      const enabled = event.target.checked;
+      const dateInput = $('#timestamp-date');
+      dateInput.disabled = !enabled;
+      if (!enabled) {
+        state.timestamp = false;
+        dateInput.value = '';
+      } else if (dateInput.value) {
+        const date = new Date(dateInput.value);
+        state.timestamp = Number.isNaN(date.getTime()) ? true : date.toISOString();
+      } else {
+        state.timestamp = true;
+        dateInput.value = toLocalInput(new Date().toISOString());
+      }
+      updatePreview();
+      save();
+    });
+
+    $('#timestamp-date').addEventListener('input', function (event) {
+      if (!state.timestamp) return;
+      const date = new Date(event.target.value);
+      state.timestamp = Number.isNaN(date.getTime()) ? true : date.toISOString();
       updatePreview();
       save();
     });
@@ -725,6 +777,194 @@
     }, 1800);
   }
 
+  /* ---------------- envoi direct via l'API du bot ---------------- */
+
+  function apiBase() {
+    const stored = (localStorage.getItem(STORAGE_API) || '').trim().replace(/\/+$/, '');
+    if (stored) return stored;
+    if (/(^|\.)(localhost|127\.0\.0\.1)$/.test(location.hostname)) return 'http://localhost:3000';
+    return '';
+  }
+
+  function setSendStatus(message, kind) {
+    const element = $('#send-status');
+    if (!element) return;
+    element.textContent = message;
+    element.dataset.kind = kind || '';
+  }
+
+  async function apiFetch(path, options) {
+    const base = apiBase();
+    if (!base) throw new Error("Renseigne l'adresse de l'API du bot.");
+    const token = localStorage.getItem(STORAGE_TOKEN) || '';
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = 'Bearer ' + token;
+    const response = await fetch(base + path, Object.assign({ headers }, options || {}));
+    let data = {};
+    try {
+      data = await response.json();
+    } catch (error) {
+      data = {};
+    }
+    if (!response.ok) throw new Error(data.message || data.error || 'Erreur ' + response.status);
+    return data;
+  }
+
+  function renderSession(payload) {
+    session = payload || null;
+    const login = $('#send-login');
+    const ready = $('#send-ready');
+    if (!login || !ready) return;
+
+    if (!session) {
+      login.hidden = false;
+      ready.hidden = true;
+      return;
+    }
+
+    login.hidden = true;
+    ready.hidden = false;
+
+    const user = session.user || {};
+    const guilds = session.guilds || [];
+    $('#send-user').innerHTML =
+      (user.avatar ? `<img src="${escAttr(user.avatar)}" alt="">` : '') +
+      '<div><strong>' +
+      escHtml(user.globalName || user.username || 'Compte Discord') +
+      '</strong><span>' +
+      guilds.length +
+      ' serveur' +
+      (guilds.length > 1 ? 's' : '') +
+      ' disponible' +
+      (guilds.length > 1 ? 's' : '') +
+      '</span></div>';
+
+    const guildSelect = $('#guild-select');
+    guildSelect.innerHTML = guilds.length
+      ? guilds
+          .map((guild) => `<option value="${escAttr(guild.id)}">${escHtml(guild.name)}</option>`)
+          .join('')
+      : '<option value="">Aucun serveur disponible</option>';
+
+    loadChannels();
+  }
+
+  async function loadChannels() {
+    const guildId = $('#guild-select').value;
+    const select = $('#channel-select');
+    if (!guildId) {
+      select.innerHTML = '<option value="">-</option>';
+      setSendStatus("Aucun serveur disponible : invite le bot et verifie tes droits.", 'error');
+      return;
+    }
+    select.innerHTML = '<option value="">Chargement...</option>';
+    try {
+      const data = await apiFetch('/api/guilds/' + encodeURIComponent(guildId) + '/channels');
+      select.innerHTML = data.channels.length
+        ? data.channels
+            .map((channel) => `<option value="${escAttr(channel.id)}">#${escHtml(channel.name)}</option>`)
+            .join('')
+        : '<option value="">Aucun salon disponible</option>';
+      setSendStatus(
+        data.channels.length ? 'Pret a envoyer.' : 'Le bot ne peut ecrire dans aucun salon de ce serveur.',
+        data.channels.length ? 'ok' : 'error',
+      );
+    } catch (error) {
+      select.innerHTML = '';
+      setSendStatus(error.message, 'error');
+    }
+  }
+
+  async function sendMessage() {
+    const embeds = buildEmbeds();
+    if (!embeds.length) {
+      toast("Ajoute du contenu avant d'envoyer");
+      return;
+    }
+    const button = $('#send-message');
+    button.disabled = true;
+    setSendStatus('Envoi en cours...');
+    try {
+      const data = await apiFetch('/api/send', {
+        method: 'POST',
+        body: JSON.stringify({
+          guildId: $('#guild-select').value,
+          channelId: $('#channel-select').value,
+          embeds,
+        }),
+      });
+      const link = $('#send-link');
+      if (link && data.url) {
+        link.href = data.url;
+        link.hidden = false;
+      }
+      const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+      setSendStatus(
+        warnings.length ? 'Envoye, avec avertissement : ' + warnings[0] : 'Message envoye sur Discord.',
+        warnings.length ? 'warn' : 'ok',
+      );
+      toast('Message envoye');
+    } catch (error) {
+      setSendStatus(error.message, 'error');
+      toast('Envoi impossible');
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function readHashSession() {
+    const hash = location.hash.replace(/^#/, '');
+    if (!hash) return;
+    const params = new URLSearchParams(hash);
+    const token = params.get('token');
+    const error = params.get('error');
+    if (token) localStorage.setItem(STORAGE_TOKEN, token);
+    if (error) setSendStatus(decodeURIComponent(error), 'error');
+    if (token || error) history.replaceState(null, '', location.pathname + location.search);
+  }
+
+  async function initSend() {
+    if (!$('#api-url')) return;
+    $('#api-url').value = apiBase();
+    readHashSession();
+
+    $('#discord-login').addEventListener('click', function () {
+      const base = ($('#api-url').value || '').trim().replace(/\/+$/, '');
+      if (!base) {
+        toast("Indique l'adresse de l'API du bot");
+        return;
+      }
+      localStorage.setItem(STORAGE_API, base);
+      window.location.href = base + '/auth/discord';
+    });
+
+    $('#guild-select').addEventListener('change', loadChannels);
+    $('#send-message').addEventListener('click', sendMessage);
+
+    $('#discord-logout').addEventListener('click', async function () {
+      try {
+        await apiFetch('/api/logout', { method: 'POST' });
+      } catch (error) {
+        /* deja deconnecte */
+      }
+      localStorage.removeItem(STORAGE_TOKEN);
+      renderSession(null);
+      setSendStatus('Deconnecte.');
+    });
+
+    if (!localStorage.getItem(STORAGE_TOKEN) || !apiBase()) {
+      renderSession(null);
+      return;
+    }
+    try {
+      renderSession(await apiFetch('/api/me'));
+    } catch (error) {
+      localStorage.removeItem(STORAGE_TOKEN);
+      renderSession(null);
+      setSendStatus(error.message, 'error');
+    }
+  }
+
   /* ---------------- modeles ---------------- */
 
   const templates = {
@@ -838,6 +1078,8 @@
     bindInputs();
     renderFields();
     updatePreview();
+
+    initSend();
 
     $('#templates').addEventListener('click', function (event) {
       const button = event.target.closest('[data-template]');

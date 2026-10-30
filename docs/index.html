@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="send.css">
 </head>
 <body>
   <header class="topbar">
@@ -128,6 +129,10 @@
             <label class="label" for="author-icon">Icone (URL)</label>
             <input class="input" id="author-icon" placeholder="https://exemple.com/avatar.png">
           </div>
+          <div class="field">
+            <label class="label" for="author-url">Lien du nom (URL)</label>
+            <input class="input" id="author-url" placeholder="https://exemple.com/profil">
+          </div>
         </div>
       </div>
 
@@ -152,6 +157,11 @@
             <span class="switch-track"></span>
             <span class="switch-label">Ajouter l'horodatage actuel</span>
           </label>
+          <div class="field">
+            <label class="label" for="timestamp-date">Horodatage personnalise</label>
+            <input class="input" id="timestamp-date" type="datetime-local">
+            <p class="hint">Laisse vide pour utiliser la date et l'heure de l'envoi.</p>
+          </div>
         </div>
       </div>
 
@@ -184,6 +194,40 @@
     </section>
 
     <aside class="preview-col">
+      <div class="card send-card">
+        <div class="card-header">
+          <h2 class="card-title">Envoyer sur Discord</h2>
+          <p class="card-desc">Connecte ton compte, choisis le serveur et le salon, le bot publie le message.</p>
+        </div>
+        <div class="card-content stack-sm">
+          <div id="send-login" class="stack-sm">
+            <div class="field">
+              <label class="label" for="api-url">Adresse de l'API du bot</label>
+              <input class="input mono" id="api-url" placeholder="http://localhost:3000">
+              <p class="hint">L'API demarre avec le bot. En ligne, mets son URL publique en https.</p>
+            </div>
+            <button class="btn btn-primary" id="discord-login">Se connecter avec Discord</button>
+          </div>
+          <div id="send-ready" class="stack-sm" hidden>
+            <div class="send-user" id="send-user"></div>
+            <div class="field">
+              <label class="label" for="guild-select">Serveur</label>
+              <select class="input" id="guild-select"></select>
+            </div>
+            <div class="field">
+              <label class="label" for="channel-select">Salon</label>
+              <select class="input" id="channel-select"></select>
+            </div>
+            <div class="row">
+              <button class="btn btn-primary" id="send-message">Envoyer le message</button>
+              <a class="btn btn-outline btn-sm" id="send-link" hidden target="_blank" rel="noopener">Voir le message</a>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="discord-logout">Deconnecter</button>
+          </div>
+          <p class="send-status" id="send-status">Le bot et son API doivent tourner pour envoyer.</p>
+        </div>
+      </div>
+
       <div class="card preview-card">
         <div class="card-header preview-head">
           <h2 class="card-title">Apercu en direct</h2>

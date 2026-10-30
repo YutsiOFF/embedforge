@@ -13,6 +13,7 @@ const {
 
 const embedCommand = require('./commands/embed');
 const { handleButton, handleSelect, handleModal } = require('./interactions');
+const { startApi } = require('./api');
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -63,4 +64,5 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
+startApi(client);
 client.login(token);
