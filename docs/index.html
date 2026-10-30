@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="fr" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EmbedForge - Constructeur d'embeds Discord</title>
+  <meta name="description" content="Construis, previsualise et exporte tes embeds Discord en JSON, puis envoie-les avec le bot /embed import.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">&#9672;</span>
+      <div>
+        <h1>EmbedForge</h1>
+        <p>Constructeur d'embeds Discord</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <a class="btn btn-outline btn-sm" href="https://github.com/shadcn-ui/ui" target="_blank" rel="noopener">Design shadcn/ui</a>
+      <button class="btn btn-ghost btn-icon" id="theme-toggle" aria-label="Changer de theme">&#127769;</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="stack">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Modeles</h2>
+          <p class="card-desc">Un point de depart, puis personnalise tout.</p>
+        </div>
+        <div class="card-content templates" id="templates">
+          <button class="btn btn-secondary btn-sm" data-template="annonce">&#128227; Annonce</button>
+          <button class="btn btn-secondary btn-sm" data-template="reglement">&#128220; Reglement</button>
+          <button class="btn btn-secondary btn-sm" data-template="maj">&#128640; Mise a jour</button>
+          <button class="btn btn-secondary btn-sm" data-template="sondage">&#128202; Sondage</button>
+          <button class="btn btn-secondary btn-sm" data-template="profil">&#129706; Profil</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Contenu</h2>
+          <p class="card-desc">Titre, lien cliquable et description Markdown.</p>
+        </div>
+        <div class="card-content stack-sm">
+          <div class="grid-2">
+            <div class="field">
+              <label class="label" for="title">Titre</label>
+              <input class="input" id="title" maxlength="256" placeholder="Nouvelle saison">
+              <p class="counter" id="counter-title">0 / 256</p>
+            </div>
+            <div class="field">
+              <label class="label" for="url">Lien du titre</label>
+              <input class="input" id="url" placeholder="https://exemple.com">
+              <p class="hint">Rendu cliquable sur le titre.</p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="description">Description</label>
+            <textarea class="textarea" id="description" rows="6" maxlength="4096"
+              placeholder="**Bienvenue !**&#10;&#10;- *italique*&#10;- [lien](https://exemple.com)&#10;- `code`"></textarea>
+            <p class="counter" id="counter-description">0 / 4096</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Apparence</h2>
+          <p class="card-desc">Couleur de la barre laterale, image et miniature.</p>
+        </div>
+        <div class="card-content stack-sm">
+          <div class="grid-2">
+            <div class="field">
+              <label class="label" for="color-hex">Couleur</label>
+              <div class="color-row">
+                <input type="color" id="color-picker" value="#5865f2" aria-label="Selecteur de couleur">
+                <input class="input mono" id="color-hex" maxlength="7" value="#5865f2">
+              </div>
+              <div class="swatches" id="swatches"></div>
+            </div>
+            <div class="field">
+              <label class="label" for="image">Image (grande)</label>
+              <input class="input" id="image" placeholder="https://exemple.com/image.png">
+              <p class="hint">Affichee sous le contenu.</p>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="thumbnail">Miniature</label>
+            <input class="input" id="thumbnail" placeholder="https://exemple.com/miniature.png">
+            <p class="hint">Petite image a droite du contenu.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Auteur</h2>
+          <p class="card-desc">La ligne au-dessus du titre.</p>
+        </div>
+        <div class="card-content grid-2">
+          <div class="field">
+            <label class="label" for="author-name">Nom</label>
+            <input class="input" id="author-name" maxlength="256" placeholder="EmbedForge">
+          </div>
+          <div class="field">
+            <label class="label" for="author-icon">Icone (URL)</label>
+            <input class="input" id="author-icon" placeholder="https://exemple.com/avatar.png">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Footer</h2>
+          <p class="card-desc">Bas de l'embed, avec horodatage optionnel.</p>
+        </div>
+        <div class="card-content stack-sm">
+          <div class="grid-2">
+            <div class="field">
+              <label class="label" for="footer-text">Texte</label>
+              <input class="input" id="footer-text" maxlength="2048" placeholder="Serveur Discord - 2026">
+            </div>
+            <div class="field">
+              <label class="label" for="footer-icon">Icone (URL)</label>
+              <input class="input" id="footer-icon" placeholder="https://exemple.com/icone.png">
+            </div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="timestamp">
+            <span class="switch-track"></span>
+            <span class="switch-label">Ajouter l'horodatage actuel</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Champs</h2>
+          <p class="card-desc">25 maximum. Inline aligne jusqu'a 3 champs par ligne.</p>
+        </div>
+        <div class="card-content stack-sm">
+          <div id="fields-list" class="stack-sm"></div>
+          <button class="btn btn-primary btn-sm" id="add-field">Ajouter un champ</button>
+          <p class="counter" id="counter-fields">0 / 25 champs</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">JSON</h2>
+          <p class="card-desc">Colle un JSON existant, ou recupere celui genere ci-contre.</p>
+        </div>
+        <div class="card-content stack-sm">
+          <textarea class="textarea mono" id="import-json" rows="6" placeholder='{ "title": "Mon annonce", "color": 5793266 }'></textarea>
+          <div class="row">
+            <button class="btn btn-outline btn-sm" id="import-btn">Charger ce JSON</button>
+            <button class="btn btn-ghost btn-sm" id="clear-btn">Vider</button>
+          </div>
+          <p class="hint">Fonctionne aussi avec <code>{ "embeds": [ ... ] }</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <aside class="preview-col">
+      <div class="card preview-card">
+        <div class="card-header preview-head">
+          <h2 class="card-title">Apercu en direct</h2>
+          <span class="badge" id="char-badge">0 / 6000</span>
+        </div>
+        <div class="card-content">
+          <div class="discord">
+            <div class="dc-msg">
+              <div class="dc-avatar">B</div>
+              <div class="dc-msg-body">
+                <div class="dc-meta">
+                  <span class="dc-user">EmbedForge</span>
+                  <span class="dc-bot">BOT</span>
+                  <span class="dc-time">aujourd'hui</span>
+                </div>
+                <div id="preview"></div>
+              </div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" id="copy-json">Copier le JSON</button>
+            <button class="btn btn-outline" id="copy-code">Copier le code discord.js</button>
+            <button class="btn btn-outline" id="download">Telecharger</button>
+            <button class="btn btn-ghost" id="reset">Reinitialiser</button>
+          </div>
+          <p class="hint">Puis dans Discord : <code>/embed import</code> - colle le JSON - Envoyer.</p>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    <span>EmbedForge - bot + site statique - design inspire de shadcn/ui</span>
+    <span id="footer-total">0 caractere</span>
+  </footer>
+
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
