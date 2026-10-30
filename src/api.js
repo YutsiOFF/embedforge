@@ -14,6 +14,7 @@ const { URL } = require('node:url');
 const { PermissionsBitField } = require('discord.js');
 
 const { sanitizeMany } = require('./lib/embed');
+const codes = require('./lib/codes');
 
 const VERSION = '1.0.0';
 const BODY_LIMIT = 512 * 1024;
@@ -261,17 +262,90 @@ async function whoAmI(req, res, client) {
   if (!session) {
     return sendJson(res, 401, { error: 'not_authenticated', message: 'Reconnecte-toi avec Discord.' });
   }
-  try {
-    const guilds = await discordGet('/users/@me/guilds', session.data.accessToken);
-    if (Array.isArray(guilds)) session.data.guilds = guilds;
-  } catch (error) {
-    /* on garde la liste mise en cache */
+  if (!session.data.computed && session.data.accessToken) {
+    try {
+      const guilds = await discordGet('/users/@me/guilds', session.data.accessToken);
+      if (Array.isArray(guilds)) session.data.guilds = guilds;
+    } catch (error) {
+      /* on garde la liste mise en cache */
+    }
+  }
+  if (session.data.computed) {
+    session.data.guilds = await guildsForUser(client, session.data.user.id);
   }
   sendJson(res, 200, {
     user: session.data.user,
-    guilds: usableGuilds(session, client),
+    guilds: session.data.computed ? session.data.guilds : usableGuilds(session, client),
     bot: client.user ? { tag: client.user.tag } : null,
   });
+}
+
+/** Serveurs ou cet utilisateur peut publier (droits calcules par le bot). */
+async function guildsForUser(client, userId) {
+  const result = [];
+  for (const guild of client.guilds.cache.values()) {
+    let member = guild.members.cache.get(userId);
+    if (!member) {
+      try {
+        member = await guild.members.fetch(userId);
+      } catch (error) {
+        member = null;
+      }
+    }
+    if (!member) continue;
+    const allowed =
+      member.permissions.has(PermissionsBitField.Flags.Administrator) ||
+      member.permissions.has(PermissionsBitField.Flags.ManageGuild);
+    if (!allowed) continue;
+    result.push({
+      id: guild.id,
+      name: guild.name,
+      icon: guild.icon ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png?size=64` : '',
+    });
+  }
+  return result.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+}
+
+async function createCodeSession(req, res, client) {
+  let body;
+  try {
+    body = await readJson(req);
+  } catch (error) {
+    return sendJson(res, 400, { error: 'bad_body', message: 'Corps JSON invalide.' });
+  }
+
+  const entry = codes.take(body.code);
+  if (!entry) {
+    return sendJson(res, 400, {
+      error: 'bad_code',
+      message: 'Code invalide ou expire : refais /embed lien dans Discord.',
+    });
+  }
+
+  let user;
+  try {
+    const account = await client.users.fetch(entry.userId);
+    user = {
+      id: account.id,
+      username: account.username,
+      globalName: account.globalName || '',
+      avatar: account.displayAvatarURL({ size: 64 }),
+    };
+  } catch (error) {
+    return sendJson(res, 400, { error: 'unknown_user', message: 'Compte Discord introuvable.' });
+  }
+
+  const guilds = await guildsForUser(client, entry.userId);
+  const token = crypto.randomBytes(24).toString('hex');
+  sessions.set(token, {
+    user,
+    guilds,
+    computed: true,
+    accessToken: null,
+    expires: Date.now() + SESSION_TTL,
+  });
+
+  sendJson(res, 200, { token, user, guilds });
 }
 
 async function botMember(guild, client) {
@@ -412,6 +486,7 @@ async function handle(req, res, client, config) {
   if (path === '/auth/discord/callback') return finishLogin(res, url, config);
   if (path === '/api/me') return whoAmI(req, res, client);
   if (path === '/api/logout') return logout(req, res);
+  if (path === '/api/session' && req.method === 'POST') return createCodeSession(req, res, client);
 
   const channels = path.match(/^\/api\/guilds\/(\d{5,25})\/channels$/);
   if (channels && req.method === 'GET') return listChannels(req, res, client, channels[1]);

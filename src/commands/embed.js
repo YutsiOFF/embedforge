@@ -3,6 +3,7 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 
 const { createModal, importModal } = require('../modals');
+const codes = require('../lib/codes');
 
 const SITE_URL = process.env.SITE_URL || 'https://yutsioff.github.io/embedforge/';
 
@@ -20,6 +21,11 @@ module.exports = {
     )
     .addSubcommand((sub) =>
       sub.setName('aide').setDescription('Mode emploi du constructeur + lien du site'),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('lien')
+        .setDescription('Genere un code pour te connecter au site et envoyer depuis la page web'),
     ),
 
   async execute(interaction) {
@@ -31,6 +37,24 @@ module.exports = {
 
     if (sub === 'import') {
       return interaction.showModal(importModal());
+    }
+
+    if (sub === 'lien') {
+      const code = codes.create(interaction.user.id);
+      return interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: [
+          '**Connexion au constructeur web**',
+          '',
+          `Code : \`${code}\``,
+          '',
+          `1. Ouvre ${SITE_URL}`,
+          '2. Carte **Envoyer sur Discord** -> *Sans connexion Discord : utiliser un code*',
+          '3. Colle le code, valide, choisis le salon et envoie.',
+          '',
+          'Valable 10 minutes, utilisable une seule fois.',
+        ].join('\n'),
+      });
     }
 
     return interaction.reply({
@@ -52,6 +76,8 @@ module.exports = {
         '',
         `Constructeur visuel : ${SITE_URL}`,
         'Le JSON du site se colle directement via `/embed import`.',
+        '',
+        '**Envoi direct depuis le site** : `/embed lien` -> code de connexion a coller sur la page web.',
       ].join('\n'),
     });
   },

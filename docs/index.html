@@ -207,6 +207,15 @@
               <p class="hint">L'API demarre avec le bot. En ligne, mets son URL publique en https.</p>
             </div>
             <button class="btn btn-primary" id="discord-login">Se connecter avec Discord</button>
+            <details class="fallback">
+              <summary>Sans connexion Discord : utiliser un code</summary>
+              <div class="field">
+                <label class="label" for="link-code">Code de /embed lien</label>
+                <input class="input mono" id="link-code" maxlength="12" placeholder="ABCD2345">
+              </div>
+              <button class="btn btn-outline btn-sm" id="link-login">Valider le code</button>
+              <p class="hint">Dans Discord : <code>/embed lien</code>, puis colle le code ici (valable 10 minutes).</p>
+            </details>
           </div>
           <div id="send-ready" class="stack-sm" hidden>
             <div class="send-user" id="send-user"></div>

@@ -941,6 +941,26 @@
     $('#guild-select').addEventListener('change', loadChannels);
     $('#send-message').addEventListener('click', sendMessage);
 
+    $('#link-login').addEventListener('click', async function () {
+      const code = ($('#link-code').value || '').trim();
+      if (!code) {
+        toast('Colle le code de /embed lien');
+        return;
+      }
+      setSendStatus('Verification du code...');
+      try {
+        const data = await apiFetch('/api/session', {
+          method: 'POST',
+          body: JSON.stringify({ code }),
+        });
+        localStorage.setItem(STORAGE_TOKEN, data.token);
+        renderSession({ user: data.user, guilds: data.guilds });
+        setSendStatus('Connecte. Choisis un salon puis envoie.', 'ok');
+      } catch (error) {
+        setSendStatus(error.message, 'error');
+      }
+    });
+
     $('#discord-logout').addEventListener('click', async function () {
       try {
         await apiFetch('/api/logout', { method: 'POST' });

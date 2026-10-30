@@ -56,3 +56,19 @@
   color: #ed4245;
   opacity: 1;
 }
+
+.fallback summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  opacity: 0.8;
+  padding: 4px 0;
+}
+
+.fallback[open] summary {
+  opacity: 1;
+  margin-bottom: 8px;
+}
+
+.fallback .hint {
+  margin-top: 8px;
+}
